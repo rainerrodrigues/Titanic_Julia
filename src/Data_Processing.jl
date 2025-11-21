@@ -12,18 +12,23 @@ ismissing.(data_train) .== true
 ismissing(data_train)
 
 describe(data_train)
+describe(data_train, :nmissing)[[6,11,12], :]
 
-processed_data = data_train[:,Not([:PassengerId,:Name,:Cabin,:Ticket,:Embarked,:Fare])]
+imputed_data = copy(data_train)
+imputed_data.Age = coalesce.(imputed_data.Age, Impute.median(skipmissing(imputed_data.Age)))
+imputed_data.Fare = coalesce.(imputed_data.Fare, Impute.mean(skipmissing(imputed_data.Fare)))
+imputed_data.Embarked = coalesce.(imputed_data.Embarked, Impute.mode(skipmissing(imputed_data.Embarked)))
 
-any(ismissing, eachrow(processed_data))
+using MLJScientificTypes
+schema(imputed_data)
 
-n_rows = nrow(processed_data)
-total_missing = sum(col -> sum(ismissing, processed_data[!, col]), names(processed_data))
-missing_pct = round((total_missing / n_rows) * 100, digits=2)
+coerce!(imputed_data, :Survived => OrderedFactor,
+            :Pclass => OrderedFactor,
+            :Sex => Multiclass,
+            :Embarked => Multiclass,
+            :Age => Continuous,
+            :Fare => Continuous,
+            :SibSp => Count,
+            :Parch => Count)
 
-for col in names(processed_data)
-    pct = (sum(ismissing, processed_data[!, col]) / n_rows) * 100
-    if 19.5 ≤ pct ≤ 20.5  # Check for values around 20%
-        println("$col has $(round(pct, digits=2))% missing data")
-    end
-end
+schema(imputed_data)
